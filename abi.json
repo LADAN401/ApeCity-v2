@@ -1,0 +1,38 @@
+[
+  {
+    "inputs": [
+      {"internalType":"string","name":"name","type":"string"},
+      {"internalType":"string","name":"symbol","type":"string"},
+      {"internalType":"uint256","name":"maxSupply","type":"uint256"}
+    ],
+    "name":"createToken",
+    "outputs":[{"internalType":"address","name":"","type":"address"}],
+    "stateMutability":"nonpayable",
+    "type":"function"
+  },
+  {
+    "inputs":[{"internalType":"address","name":"tokenAddress","type":"address"}],
+    "name":"buyToken",
+    "outputs":[],
+    "stateMutability":"payable",
+    "type":"function"
+  },
+  {
+    "inputs":[],
+    "name":"getAllTokens",
+    "outputs":[
+      {
+        "components":[
+          {"internalType":"address","name":"token","type":"address"},
+          {"internalType":"string","name":"name","type":"string"},
+          {"internalType":"string","name":"symbol","type":"string"}
+        ],
+        "internalType":"struct ApeCityFactory.TokenInfo[]",
+        "name":"",
+        "type":"tuple[]"
+      }
+    ],
+    "stateMutability":"view",
+    "type":"function"
+  }
+]
