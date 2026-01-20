@@ -15,7 +15,7 @@ from telegram.ext import (
 )
 
 # ================= CONFIG =================
-BOT_TOKEN = "PUT_YOUR_TELEGRAM_BOT_TOKEN"
+BOT_TOKEN = "8579124748:AAF2rjNV305KVVgHjtpB9_vBHxTkLMTZwyU"
 BASE_RPC = "https://mainnet.base.org"
 FACTORY_ADDRESS = Web3.to_checksum_address(
     "0x223Dd4B140A6C5cFb3e732d55B0991BfF952f273"
