@@ -1,176 +1,72 @@
-import json
-from web3 import Web3
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
+// Ape City Telegram Launchpad Bot // FULL WORKING VERSION (Buttons + Base Contract) // Node.js v18+, ethers v6, no external APIs
 
-# ================= CONFIG =================
-BOT_TOKEN = "8579124748:AAF2rjNV305KVVgHjtpB9_vBHxTkLMTZwyU"
-BASE_RPC = "https://mainnet.base.org"
-FACTORY_ADDRESS = Web3.to_checksum_address(
-    "0x223Dd4B140A6C5cFb3e732d55B0991BfF952f273"
-)
+import TelegramBot from "node-telegram-bot-api"; import { ethers } from "ethers"; import dotenv from "dotenv";
 
-w3 = Web3(Web3.HTTPProvider(BASE_RPC))
+dotenv.config();
 
-with open("abi.json") as f:
-    FACTORY_ABI = json.load(f)
+// ================= CONFIG ================= const BOT_TOKEN = process.env.BOT_TOKEN; const BASE_RPC = process.env.BASE_RPC_URL || "https://mainnet.base.org"; const FACTORY_ADDRESS = "0x223Dd4B140A6C5cFb3e732d55B0991BfF952f273";
 
-factory = w3.eth.contract(
-    address=FACTORY_ADDRESS,
-    abi=FACTORY_ABI
-)
+if (!BOT_TOKEN) { console.error("❌ BOT_TOKEN missing"); process.exit(1); }
 
-# TEMP SESSION STORAGE (RAM ONLY)
-sessions = {}
+// ================= ABI ================= const FACTORY_ABI = [ "function createToken(string name,string symbol,uint256 maxSupply) returns (address)", "function buyToken(address tokenAddress) payable", "function BASE_PRICE() view returns (uint256)", "function getAllTokens() view returns (tuple(address token,string name,string symbol)[])" ];
 
-# ================= UI =================
-def main_menu():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔐 Import Wallet", callback_data="import")],
-        [InlineKeyboardButton("🪙 Create Token", callback_data="create")],
-        [InlineKeyboardButton("💰 Buy Token", callback_data="buy")],
-        [InlineKeyboardButton("📜 All Tokens", callback_data="list")]
-    ])
+// ================= BOT ================= const bot = new TelegramBot(BOT_TOKEN, { polling: true }); const provider = new ethers.JsonRpcProvider(BASE_RPC);
 
-# ================= COMMANDS =================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🐵 *APE CITY LAUNCHPAD*\n\n"
-        "Create & buy Base tokens on-chain.\n"
-        "⚠️ Use a fresh wallet only.",
-        reply_markup=main_menu(),
-        parse_mode="Markdown"
-    )
+// userId => wallet const userWallets = {};
 
-# ================= CALLBACKS =================
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+console.log("✅ Ape City Bot running...");
 
-    uid = query.from_user.id
+// ================= START ================= bot.onText(//start/, (msg) => { bot.sendMessage(msg.chat.id, "🏙️ Welcome to Ape City\nBase Token Launchpad", { parse_mode: "Markdown", reply_markup: { inline_keyboard: [ [{ text: "🔑 Import Wallet", callback_data: "import_wallet" }], [{ text: "🚀 Create Token", callback_data: "create_token" }], [{ text: "💰 Buy Token", callback_data: "buy_token" }], [{ text: "📊 List Tokens", callback_data: "list_tokens" }] ] } }); });
 
-    if query.data == "import":
-        sessions[uid] = {}
-        await query.message.reply_text(
-            "🔑 Send your *PRIVATE KEY* (Base wallet)\n\n"
-            "⚠️ Fresh wallet only.",
-            parse_mode="Markdown"
-        )
+// ================= BUTTON HANDLER ================= bot.on("callback_query", async (query) => { const chatId = query.message.chat.id; const action = query.data; await bot.answerCallbackQuery(query.id);
 
-    elif query.data == "create":
-        if uid not in sessions or "account" not in sessions[uid]:
-            await query.message.reply_text("❌ Import wallet first")
-            return
-        await query.message.reply_text(
-            "Send token details in this format:\n\n"
-            "`Name,Symbol,MaxSupply`\n\n"
-            "Example:\n"
-            "`Ape Coin,APE,1000000`",
-            parse_mode="Markdown"
-        )
-        sessions[uid]["action"] = "create"
+if (action === "import_wallet") { bot.sendMessage(chatId, "🔐 Send your private key (Base wallet)", { parse_mode: "Markdown" }); }
 
-    elif query.data == "buy":
-        if uid not in sessions or "account" not in sessions[uid]:
-            await query.message.reply_text("❌ Import wallet first")
-            return
-        await query.message.reply_text(
-            "Send buy order:\n\n"
-            "`TokenAddress,ETH_amount`\n\n"
-            "Example:\n"
-            "`0xABC...,0.01`",
-            parse_mode="Markdown"
-        )
-        sessions[uid]["action"] = "buy"
+if (action === "create_token") { if (!userWallets[chatId]) { return bot.sendMessage(chatId, "❌ Import wallet first"); } bot.sendMessage(chatId, "✍️ Send token details:\nName,Symbol,MaxSupply", { parse_mode: "Markdown" }); }
 
-    elif query.data == "list":
-        tokens = factory.functions.getAllTokens().call()
-        if not tokens:
-            await query.message.reply_text("No tokens yet.")
-            return
+if (action === "buy_token") { if (!userWallets[chatId]) { return bot.sendMessage(chatId, "❌ Import wallet first"); } bot.sendMessage(chatId, "💰 Send token address to buy"); }
 
-        msg = "📜 *Ape City Tokens*\n\n"
-        for t in tokens:
-            msg += f"{t[1]} ({t[2]})\n`{t[0]}`\n\n"
+if (action === "list_tokens") { const factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, provider); const tokens = await factory.getAllTokens(); if (tokens.length === 0) return bot.sendMessage(chatId, "No tokens yet");
 
-        await query.message.reply_text(msg, parse_mode="Markdown")
+let text = "📊 *Ape City Tokens*\n\n";
+tokens.forEach((t, i) => {
+  text += `${i + 1}. ${t.name} (${t.symbol})\n${t.token}\n\n`;
+});
+bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
 
-# ================= TEXT HANDLER =================
-async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.message.from_user.id
-    text = update.message.text.strip()
+} });
 
-    # IMPORT KEY
-    if uid in sessions and "account" not in sessions[uid]:
-        acct = w3.eth.account.from_key(text)
-        sessions[uid]["account"] = acct
-        await update.message.reply_text(
-            f"✅ Wallet imported\n\n`{acct.address}`",
-            parse_mode="Markdown",
-            reply_markup=main_menu()
-        )
-        return
+// ================= TEXT HANDLER ================= bot.on("message", async (msg) => { const chatId = msg.chat.id; const text = msg.text;
 
-    if uid not in sessions or "action" not in sessions[uid]:
-        return
+if (!text) return;
 
-    acct = sessions[uid]["account"]
+// PRIVATE KEY IMPORT if (text.startsWith("0x") && text.length === 66 && !userWallets[chatId]) { try { const wallet = new ethers.Wallet(text, provider); userWallets[chatId] = wallet; bot.sendMessage(chatId, ✅ Wallet imported\n${wallet.address}); } catch { bot.sendMessage(chatId, "❌ Invalid private key"); } return; }
 
-    # CREATE TOKEN
-    if sessions[uid]["action"] == "create":
-        name, symbol, supply = text.split(",")
-        tx = factory.functions.createToken(
-            name.strip(),
-            symbol.strip(),
-            int(supply.strip())
-        ).build_transaction({
-            "from": acct.address,
-            "nonce": w3.eth.get_transaction_count(acct.address),
-            "gas": 2_000_000,
-            "gasPrice": w3.eth.gas_price
-        })
-        signed = acct.sign_transaction(tx)
-        txh = w3.eth.send_raw_transaction(signed.rawTransaction)
-        await update.message.reply_text(
-            f"🚀 Token creation sent\n\nTx:\n{txh.hex()}",
-            reply_markup=main_menu()
-        )
+// CREATE TOKEN if (text.includes(",") && userWallets[chatId]) { const parts = text.split(","); if (parts.length === 3) { try { const [name, symbol, supply] = parts; const wallet = userWallets[chatId]; const factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, wallet);
 
-    # BUY TOKEN
-    if sessions[uid]["action"] == "buy":
-        token, eth = text.split(",")
-        tx = factory.functions.buyToken(
-            Web3.to_checksum_address(token.strip())
-        ).build_transaction({
-            "from": acct.address,
-            "value": w3.to_wei(eth.strip(), "ether"),
-            "nonce": w3.eth.get_transaction_count(acct.address),
-            "gas": 500_000,
-            "gasPrice": w3.eth.gas_price
-        })
-        signed = acct.sign_transaction(tx)
-        txh = w3.eth.send_raw_transaction(signed.rawTransaction)
-        await update.message.reply_text(
-            f"💰 Buy order sent\n\nTx:\n{txh.hex()}",
-            reply_markup=main_menu()
-        )
+const tx = await factory.createToken(name.trim(), symbol.trim(), supply.trim());
+    bot.sendMessage(chatId, "⏳ Creating token...");
+    await tx.wait();
+    bot.sendMessage(chatId, "✅ Token created successfully");
+  } catch (e) {
+    bot.sendMessage(chatId, "❌ Token creation failed");
+  }
+}
+return;
 
-    sessions[uid].pop("action", None)
+}
 
-# ================= RUN =================
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(buttons))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-app.run_polling()
+// BUY TOKEN if (ethers.isAddress(text) && userWallets[chatId]) { try { const wallet = userWallets[chatId]; const factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, wallet);
+
+const tx = await factory.buyToken(text, {
+    value: ethers.parseEther("0.001")
+  });
+
+  bot.sendMessage(chatId, "⏳ Buying token...");
+  await tx.wait();
+  bot.sendMessage(chatId, "✅ Token purchased");
+} catch {
+  bot.sendMessage(chatId, "❌ Buy failed");
+}
+
+} }); 
